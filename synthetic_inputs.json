@@ -1,0 +1,8 @@
+{
+  "classification": "SYNTHETIC",
+  "order_id": "SYNTHETIC_ORDER_ALPHA",
+  "messages": [
+    "item=SYNTHETIC_TSHIRT;quantity=2",
+    "size=M;address=SYNTHETIC_ADDRESS_ALPHA;phone=SYNTHETIC_PHONE_ALPHA"
+  ]
+}
