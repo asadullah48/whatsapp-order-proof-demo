@@ -28,3 +28,6 @@ with socket creation blocked. No real services or API keys were used by the demo
 
 The README output was captured by subprocess from the actual demo command,
 and its Mermaid text was emitted by the code's --diagram command.
+
+VERIFIED 4 Nov 2026 at code commit `e00fa9db6239fbc818045d3669535109f84ea713`:
+`python -B -m unittest discover -v` from the new repository root: **19 tests passed in 0.120s, OK**.
