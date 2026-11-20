@@ -1,5 +1,6 @@
 """Offline SYNTHETIC order workflow. Python standard library only."""
 import csv
+import datetime
 import io
 import json
 import sqlite3
@@ -51,8 +52,9 @@ def validate(fields):
     return issues
 
 class Workflow:
-    def __init__(self, database=':memory:'):
+    def __init__(self, database=':memory:', audit_path=None):
         self.db = sqlite3.connect(database)
+        self.audit_path = audit_path  # JSONL file, append-only; None disables auditing
         self.db.execute('CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, fields TEXT NOT NULL, status TEXT NOT NULL)')
         self.db.execute('CREATE TABLE IF NOT EXISTS outbox (order_id TEXT PRIMARY KEY REFERENCES orders(id), message TEXT NOT NULL)')
 
@@ -65,7 +67,16 @@ class Workflow:
             raise ValueError('Unknown order')
         return json.loads(row[0]), State(row[1])
 
-    def receive(self, order_id, message):
+    def _audit(self, order_id, old, new, actor):
+        # Called inside the DB transaction: if the append fails, the state change rolls back.
+        if self.audit_path is None or old == new:
+            return
+        line = {'time': datetime.datetime.now(datetime.UTC).isoformat(), 'order': order_id,
+                'from': old.value, 'to': new.value, 'actor': actor}
+        with open(self.audit_path, 'a', encoding='utf-8') as log:
+            log.write(json.dumps(line, sort_keys=True) + '\n')
+
+    def receive(self, order_id, message, *, actor='SYNTHETIC_CUSTOMER'):
         if not order_id.startswith('SYNTHETIC_'):
             raise ValueError('SYNTHETIC order ID required')
         row = self.db.execute('SELECT fields,status FROM orders WHERE id=?', (order_id,)).fetchone()
@@ -76,6 +87,7 @@ class Workflow:
         with self.db:
             self.db.execute('INSERT INTO orders VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET fields=excluded.fields,status=excluded.status',
                             (order_id, json.dumps(fields, sort_keys=True), status))
+            self._audit(order_id, current, status, actor)
         return {'classification': 'SYNTHETIC', 'order': order_id, 'status': status,
                 'question': 'Please provide/correct: ' + ', '.join(issues) if issues else None}
 
@@ -91,6 +103,7 @@ class Workflow:
             raise ValueError('Complete order awaiting approval required')
         with self.db:
             self.db.execute('UPDATE orders SET status=? WHERE id=?', (next_status, order_id))
+            self._audit(order_id, status, next_status, actor)
         return next_status
 
     def confirm(self, order_id):
@@ -117,9 +130,9 @@ class Workflow:
             writer.writerow(["'" + value if value.startswith(('=', '+', '-', '@', '\t', '\r')) else value for value in values])
         return output.getvalue()
 
-def run_demo(database=':memory:'):
+def run_demo(database=':memory:', audit_path=None):
     fixture = json.loads(Path(__file__).with_name('synthetic_inputs.json').read_text(encoding='utf-8'))
-    flow = Workflow(database)
+    flow = Workflow(database, audit_path)
     try:
         print('SYNTHETIC DATA ONLY. No real customers, phone numbers, invoices, or network calls.')
         # Repeat runs use a fresh in-memory database by default.
