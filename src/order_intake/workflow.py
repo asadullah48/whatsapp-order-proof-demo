@@ -6,9 +6,9 @@ import json
 import sqlite3
 from pathlib import Path
 
+from .parsers import FIELDS, KeyValueParser, check_schema, parse_fields  # noqa: F401 (parse_fields re-exported)
 from .state import Event, State, next_state
 
-FIELDS = ('item', 'quantity', 'size', 'address', 'phone')
 CATALOGUE = {'SYNTHETIC_TSHIRT': ('S', 'M', 'L')}
 EDGES = (
     ('Input', 'parse_fields'), ('parse_fields', 'validate'),
@@ -20,17 +20,6 @@ EDGES = (
 
 def diagram():
     return 'flowchart LR\n' + '\n'.join(f'    {a} --> {b}' for a, b in EDGES)
-
-def parse_fields(message):
-    """Explicit key=value grammar; never pretend to understand arbitrary prose."""
-    result = {}
-    for chunk in message.split(';'):
-        key, separator, value = chunk.strip().partition('=')
-        if not separator or key not in FIELDS or key in result:
-            raise ValueError('Use unique item/quantity/size/address/phone key=value fields')
-        if value.strip():
-            result[key] = value.strip()
-    return result
 
 def validate(fields):
     issues = []
@@ -52,8 +41,9 @@ def validate(fields):
     return issues
 
 class Workflow:
-    def __init__(self, database=':memory:', audit_path=None):
+    def __init__(self, database=':memory:', audit_path=None, parser=None):
         self.db = sqlite3.connect(database)
+        self.parser = parser or KeyValueParser()
         self.audit_path = audit_path  # JSONL file, append-only; None disables auditing
         self.db.execute('CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, fields TEXT NOT NULL, status TEXT NOT NULL)')
         self.db.execute('CREATE TABLE IF NOT EXISTS outbox (order_id TEXT PRIMARY KEY REFERENCES orders(id), message TEXT NOT NULL)')
@@ -81,7 +71,7 @@ class Workflow:
             raise ValueError('SYNTHETIC order ID required')
         row = self.db.execute('SELECT fields,status FROM orders WHERE id=?', (order_id,)).fetchone()
         fields, current = (json.loads(row[0]), State(row[1])) if row else ({}, State.NEW)
-        fields.update(parse_fields(message))
+        fields.update(check_schema(self.parser.parse(message)))
         issues = validate(fields)
         status = next_state(current, Event.SUBMIT_INCOMPLETE if issues else Event.SUBMIT_COMPLETE)
         with self.db:
@@ -130,9 +120,9 @@ class Workflow:
             writer.writerow(["'" + value if value.startswith(('=', '+', '-', '@', '\t', '\r')) else value for value in values])
         return output.getvalue()
 
-def run_demo(database=':memory:', audit_path=None):
+def run_demo(database=':memory:', audit_path=None, parser=None):
     fixture = json.loads(Path(__file__).with_name('synthetic_inputs.json').read_text(encoding='utf-8'))
-    flow = Workflow(database, audit_path)
+    flow = Workflow(database, audit_path, parser)
     try:
         print('SYNTHETIC DATA ONLY. No real customers, phone numbers, invoices, or network calls.')
         # Repeat runs use a fresh in-memory database by default.
