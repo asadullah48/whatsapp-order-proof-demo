@@ -1,0 +1,18 @@
+[project]
+name = "whatsapp-order-proof-demo"
+version = "0.1.0"
+description = "Offline SYNTHETIC order-intake workflow demo (no WhatsApp integration)."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Asadullah Shafique" }]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.pytest.ini_options]
+addopts = "-q"

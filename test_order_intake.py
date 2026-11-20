@@ -1,7 +1,6 @@
 import contextlib
 import csv
 import io
-import json
 import socket
 import tempfile
 import unittest
