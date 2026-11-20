@@ -143,9 +143,8 @@ are dated records from the earlier single-file version; their `python order_inta
 - Default parsing is deterministic `key=value`; it does not understand free text.
 - Owner actions are scripted and the actor string is a local simulation, not authentication.
   Audit `actor` values are therefore claims, not verified identities.
-- The audit table is append-only through SQLite triggers, not tamper-evident: no hashing or
-  signing, and anyone with write access to the database file can drop the triggers or edit rows.
-  The JSONL export is a plain file with no protection at all.
+- The audit table is append-only by SQLite trigger. It is not tamper-proof: anyone with the database file can drop the triggers.
+  There is no hashing or signing, and the JSONL export is a plain file with no protection at all.
 - No concurrency handling: two writers on one SQLite file or one log file are not coordinated.
 - Confirmation is a local outbox insert. Export is printed CSV, not a saved Sheet.
 - Synthetic prefix checks are demonstration constraints, not a personal-data detector.
@@ -158,6 +157,11 @@ are dated records from the earlier single-file version; their `python order_inta
 - A live-tested LLM parser, an eval set for it, or any measured extraction accuracy.
 - Tamper-evident audit storage (hash chain or signing) or audit retention/rotation.
 - Deployment of any kind.
+
+## Changed in 0.2.0
+- `Workflow` no longer takes `audit_path=`.
+- Audit rows are in the `audit` table, written in the same transaction as the state change.
+- JSONL is an export of that table (`export_audit_jsonl()` or `--audit-log PATH`), not the record.
 
 ## Origin
 The intake core and its 15 tests were copied from
