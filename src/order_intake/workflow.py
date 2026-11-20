@@ -141,10 +141,3 @@ def run_demo(database=':memory:'):
         print(flow.export_approved_csv(), end='')
     finally:
         flow.close()
-
-if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--diagram', action='store_true')
-    args = parser.parse_args()
-    print(diagram()) if args.diagram else run_demo()

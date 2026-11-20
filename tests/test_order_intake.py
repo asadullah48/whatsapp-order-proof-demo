@@ -123,7 +123,7 @@ class OrderTests(unittest.TestCase):
             self.flow.decide(ORDER, 'invalid', actor='SYNTHETIC_OWNER')
 
     def test_readme_diagram_matches_code(self):
-        readme = Path(__file__).with_name('README.md').read_text(encoding='utf-8')
+        readme = Path(__file__).parents[1].joinpath('README.md').read_text(encoding='utf-8')
         self.assertIn('```mermaid\n' + diagram() + '\n```', readme)
 
 class ExportTests(unittest.TestCase):
