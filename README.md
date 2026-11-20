@@ -98,7 +98,7 @@ ruff check .
 python -m pytest
 ```
 
-113 tests, run locally on Python 3.11, 3.12, 3.14 on 20 Nov 2026. GitHub CI has not run yet.
+113 tests, run locally on Python 3.11, 3.12, 3.14 on 20 Nov 2026. GitHub CI green on 20 Nov 2026 (Python 3.11 and 3.12, ruff + pytest), commit c7468f8: https://github.com/asadullah48/whatsapp-order-proof-demo/actions
 
 - `tests/test_order_intake.py` (19): the inherited workflow and CSV export tests.
 - `tests/test_state.py` (40): all 16 illegal `(state, event)` pairs at table level, the 13
@@ -127,12 +127,12 @@ Only what was actually run, on Windows, 20 Nov 2026:
 - `python -m order_intake`: output above; `--audit-log` wrote 5 lines; `--diagram` matches this README (tested).
 - `pip install -e .` in a fresh venv, then the `order-intake` console script, ran the demo from outside the repo.
 - `--parser llm` without the key env var exits with `RuntimeError` before any import or call.
+- GitHub Actions run 44787449044 on commit c7468f8 (Ubuntu): ruff clean and 113 passed, 10 subtests passed on Python 3.11 and on 3.12.
 
 Not verified:
-- The GitHub Actions workflow has not run on GitHub yet, so the badge may show no status.
 - `LLMParser.parse` has never been executed, `pip install -e ".[llm]"` was not run, and no request
   has been sent to any model. Treat it as unexercised code, not a working feature.
-- Linux/macOS (CI targets Ubuntu, but has not run yet).
+- macOS, and Python 3.14 on CI (3.14 was run locally only).
 
 [docs/history/VALIDATION.md](docs/history/VALIDATION.md) and [docs/history/HANDOVER.md](docs/history/HANDOVER.md)
 are dated records from the earlier single-file version; their `python order_intake.py` /
