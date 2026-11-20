@@ -121,8 +121,9 @@ Not verified:
   has been sent to any model. Treat it as unexercised code, not a working feature.
 - Linux/macOS (CI targets Ubuntu, but has not run yet).
 
-`VALIDATION.md` and `HANDOVER.md` are dated records from the earlier single-file
-version and still show its old `python order_intake.py` / `unittest` commands.
+[docs/history/VALIDATION.md](docs/history/VALIDATION.md) and [docs/history/HANDOVER.md](docs/history/HANDOVER.md)
+are dated records from the earlier single-file version; their `python order_intake.py` /
+`unittest` commands no longer work.
 
 ## Limits
 - No WhatsApp Business API, webhook, Google Sheets API, or real message delivery.

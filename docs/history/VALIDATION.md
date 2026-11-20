@@ -1,3 +1,5 @@
+> **Record of the old single-file version. Commands here no longer work.**
+
 # Validation
 
 VERIFIED 4 Nov 2026, Python 3.14.7. No existing tests were weakened or removed.

@@ -1,3 +1,5 @@
+> **Record of the old single-file version. Commands here no longer work.**
+
 # Handover — whatsapp-order-proof-demo
 
 VERIFIED 2026-11-14 (Asia/Karachi).

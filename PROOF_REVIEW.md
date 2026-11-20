@@ -19,4 +19,4 @@ approved-only spreadsheet-compatible CSV, with explicit limits.
 
 No proof-repo source or tests were changed. Full configured root test suites
 were run for the two broader repos; nested hackathon projects have separate suites
-and are not included in the root-suite result. Exact results are in VALIDATION.md.
+and are not included in the root-suite result. Exact results are in docs/history/VALIDATION.md.
