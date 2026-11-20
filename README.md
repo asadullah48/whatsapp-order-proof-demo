@@ -1,5 +1,7 @@
 # SYNTHETIC WhatsApp order workflow proof
 
+[![test](https://github.com/asadullah48/whatsapp-order-proof-demo/actions/workflows/test.yml/badge.svg)](https://github.com/asadullah48/whatsapp-order-proof-demo/actions/workflows/test.yml)
+
 ## Problem
 Incomplete order messages need follow-up, corrections, and owner review before confirmation.
 This personal code sample demonstrates that core workflow offline. It is proof of skill,

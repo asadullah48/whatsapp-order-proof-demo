@@ -6,7 +6,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from .parsers import FIELDS, KeyValueParser, check_schema, parse_fields  # noqa: F401 (parse_fields re-exported)
+from .parsers import FIELDS, KeyValueParser, check_schema
 from .state import Event, State, next_state
 
 CATALOGUE = {'SYNTHETIC_TSHIRT': ('S', 'M', 'L')}

@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
 from order_intake import Workflow, diagram, parse_fields, run_demo, validate
 
 COMPLETE = 'item=SYNTHETIC_TSHIRT;quantity=2;size=M;address=SYNTHETIC_ADDRESS_ALPHA;phone=SYNTHETIC_PHONE_ALPHA'
