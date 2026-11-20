@@ -5,6 +5,8 @@ import json
 import sqlite3
 from pathlib import Path
 
+from .state import Event, State, next_state
+
 FIELDS = ('item', 'quantity', 'size', 'address', 'phone')
 CATALOGUE = {'SYNTHETIC_TSHIRT': ('S', 'M', 'L')}
 EDGES = (
@@ -61,18 +63,16 @@ class Workflow:
         row = self.db.execute('SELECT fields,status FROM orders WHERE id=?', (order_id,)).fetchone()
         if row is None:
             raise ValueError('Unknown order')
-        return json.loads(row[0]), row[1]
+        return json.loads(row[0]), State(row[1])
 
     def receive(self, order_id, message):
         if not order_id.startswith('SYNTHETIC_'):
             raise ValueError('SYNTHETIC order ID required')
         row = self.db.execute('SELECT fields,status FROM orders WHERE id=?', (order_id,)).fetchone()
-        if row and row[1] in ('approved', 'rejected'):
-            raise ValueError('Terminal order cannot be edited')
-        fields = json.loads(row[0]) if row else {}
+        fields, current = (json.loads(row[0]), State(row[1])) if row else ({}, State.NEW)
         fields.update(parse_fields(message))
         issues = validate(fields)
-        status = 'waiting_for_details' if issues else 'waiting_for_approval'
+        status = next_state(current, Event.SUBMIT_INCOMPLETE if issues else Event.SUBMIT_COMPLETE)
         with self.db:
             self.db.execute('INSERT INTO orders VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET fields=excluded.fields,status=excluded.status',
                             (order_id, json.dumps(fields, sort_keys=True), status))
@@ -86,16 +86,16 @@ class Workflow:
         fields, status = self.get(order_id)
         if decision not in ('approve', 'reject', 'correct'):
             raise ValueError('Unknown decision')
-        if status != 'waiting_for_approval' or validate(fields):
+        next_status = next_state(status, Event(decision))
+        if validate(fields):  # defence in depth: state alone should already guarantee this
             raise ValueError('Complete order awaiting approval required')
-        next_status = {'approve': 'approved', 'reject': 'rejected', 'correct': 'waiting_for_details'}[decision]
         with self.db:
             self.db.execute('UPDATE orders SET status=? WHERE id=?', (next_status, order_id))
         return next_status
 
     def confirm(self, order_id):
         fields, status = self.get(order_id)
-        if status != 'approved' or validate(fields):
+        if status != State.APPROVED or validate(fields):
             raise ValueError('Confirmation blocked: owner approval required')
         message = f'SYNTHETIC confirmation for {order_id}; local outbox only; nothing sent.'
         with self.db:
