@@ -98,11 +98,24 @@ ruff check .
 python -m pytest
 ```
 
-72 tests: the 19 inherited workflow/export tests, 40 state-machine tests (all 16
-illegal `(state, event)` pairs at table level, the 13 reachable ones through the
-public API with a no-mutation check, all 9 legal moves, table shape), 3 audit-log
-tests (log equals observed state history; append across instances; rollback on a
-failed append), and 10 parser tests using a fake parser with sockets blocked.
+72 tests.
+
+- `tests/test_order_intake.py` (19): the inherited workflow and CSV export tests.
+- `tests/test_state.py` (40): all 16 illegal `(state, event)` pairs at table level, the 13
+  reachable ones through the public API with a no-mutation check, all 9 legal moves, table shape.
+- `tests/test_audit.py` (6): audit rows are written in the same SQLite transaction as the
+  state change, and the JSONL export equals the observed state history. A failure-injection
+  test lets the real audit insert run, then raises, for both `receive` and `decide`; re-reading
+  the database file on a fresh connection shows neither the state change nor the audit row
+  was committed. Triggers block `UPDATE` and `DELETE` on the audit table. Rows persist across
+  instances; the demo writes the export.
+- `tests/test_parsers.py` (48), using a fake parser with sockets blocked: parser output can
+  never approve or confirm an order (`"approve"`, `"status=approved"`, smuggled
+  `status`/`decision`/`actor` keys, or a fully valid order, sent as customer or as owner); only
+  the exact owner actor can approve (seven near-miss actor values are refused); malformed
+  output (non-objects, JSON strings, non-string or empty values, unknown or mis-cased keys) is
+  rejected by the schema check.
+
 No test calls the network or the LLM parser.
 
 ## Verified
