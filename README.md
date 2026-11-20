@@ -98,7 +98,7 @@ ruff check .
 python -m pytest
 ```
 
-72 tests.
+113 tests, run locally on Python 3.11, 3.12, 3.14 on 20 Nov 2026. GitHub CI has not run yet.
 
 - `tests/test_order_intake.py` (19): the inherited workflow and CSV export tests.
 - `tests/test_state.py` (40): all 16 illegal `(state, event)` pairs at table level, the 13
@@ -121,7 +121,7 @@ No test calls the network or the LLM parser.
 ## Verified
 Only what was actually run, on Windows, 20 Nov 2026:
 
-- `python -m pytest`: **72 passed, 10 subtests passed** on Python 3.11.15 and 3.12.13
+- `python -m pytest`: **113 passed, 10 subtests passed** on Python 3.11.15 and 3.12.13
   (fresh venvs, `pip install -e ".[dev]"`) and on Python 3.14.
 - `ruff check .`: clean with ruff 0.17.6 and 0.15.12.
 - `python -m order_intake`: output above; `--audit-log` wrote 5 lines; `--diagram` matches this README (tested).
