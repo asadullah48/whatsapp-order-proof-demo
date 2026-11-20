@@ -9,7 +9,7 @@ from .workflow import diagram, run_demo
 def main(argv=None):
     parser = argparse.ArgumentParser(prog='order_intake', description=package_doc)
     parser.add_argument('--diagram', action='store_true', help='print the Mermaid flow and exit')
-    parser.add_argument('--audit-log', metavar='PATH', help='append one JSONL line per state change to PATH')
+    parser.add_argument('--audit-log', metavar='PATH', help='after the demo, write the audit table to PATH as JSONL')
     parser.add_argument('--parser', choices=('keyvalue', 'llm'), default='keyvalue',
                         help='llm is opt-in and needs ORDER_INTAKE_ANTHROPIC_API_KEY')
     args = parser.parse_args(argv)

@@ -14,7 +14,7 @@ From this folder, with Python 3.11 or newer:
 ```powershell
 python -m pip install -e .
 python -m order_intake                                # scripted SYNTHETIC demo
-python -m order_intake --audit-log audit.jsonl        # same, plus a JSONL audit trail
+python -m order_intake --audit-log audit.jsonl        # same, plus a JSONL export of the audit table
 python -m order_intake --diagram                      # Mermaid flow below
 ```
 
@@ -34,7 +34,7 @@ CSV can be copied into a spreadsheet; this is not a Google Sheets integration.
 | --- | --- | --- |
 | State machine | `src/order_intake/state.py` | `State` enum and a `(state, event) -> state` table. Any move not in the table raises `IllegalTransition` (a `ValueError`). `approved` and `rejected` have no exits. |
 | Workflow | `src/order_intake/workflow.py` | `receive`, `decide`, `confirm`, `export_approved_csv` over SQLite. Every status change goes through the table. |
-| Audit log | `Workflow(audit_path=...)` | Append-only JSONL, one line per state change: `time` (UTC), `order`, `from`, `to`, `actor`. Written inside the DB transaction, so a failed append rolls the change back. Off unless a path is given. |
+| Audit log | `audit` table in `workflow.py` | One row per state change: `time` (UTC), `order`, `from`, `to`, `actor`. Inserted on the same SQLite connection and transaction as the state change, so both commit or neither does. SQLite triggers reject `UPDATE`/`DELETE` on the table. `export_audit_jsonl()` (and `--audit-log PATH`) writes it out as JSONL; the file is an export, not the record. |
 | Parsers | `src/order_intake/parsers.py` | `MessageParser` protocol. Default `KeyValueParser` reads explicit `key=value;...` fields. Whatever any parser returns passes `check_schema` (known fields only, non-empty strings) and then the same business `validate` before it touches an order. A parser cannot set `status`. |
 | Optional LLM parser | `LLMParser` in `parsers.py` | Off by default. Needs `pip install -e ".[llm]"`, the `ORDER_INTAKE_ANTHROPIC_API_KEY` env var, **and** `--parser llm`. Its output is untrusted and goes through the same schema check. **This code path has never been executed** (see Verified). |
 
@@ -61,7 +61,7 @@ classification,order_id,item,quantity,size,address,phone,status
 SYNTHETIC,SYNTHETIC_ORDER_ALPHA,SYNTHETIC_TSHIRT,3,M,SYNTHETIC_ADDRESS_ALPHA,SYNTHETIC_PHONE_ALPHA,approved
 ```
 
-The same run with `--audit-log` wrote 5 lines, the first being:
+The same run with `--audit-log` wrote 5 lines (then appended directly to a file; it is now an export of the audit table, same line format), the first being:
 
 ```text
 {"actor": "SYNTHETIC_CUSTOMER", "from": "new", "order": "SYNTHETIC_ORDER_ALPHA", "time": "2026-11-20T17:16:43.814032+00:00", "to": "waiting_for_details"}
@@ -129,10 +129,9 @@ version and still show its old `python order_intake.py` / `unittest` commands.
 - Default parsing is deterministic `key=value`; it does not understand free text.
 - Owner actions are scripted and the actor string is a local simulation, not authentication.
   Audit `actor` values are therefore claims, not verified identities.
-- The audit log is append-only by convention (opened in append mode), not tamper-evident:
-  no hashing or signing, and anyone with file access can edit it.
-- If the process dies between the log append and the DB commit, the log can hold a line
-  for a change that was not saved. The reverse (saved change, no line) cannot happen.
+- The audit table is append-only through SQLite triggers, not tamper-evident: no hashing or
+  signing, and anyone with write access to the database file can drop the triggers or edit rows.
+  The JSONL export is a plain file with no protection at all.
 - No concurrency handling: two writers on one SQLite file or one log file are not coordinated.
 - Confirmation is a local outbox insert. Export is printed CSV, not a saved Sheet.
 - Synthetic prefix checks are demonstration constraints, not a personal-data detector.
@@ -143,7 +142,7 @@ version and still show its old `python order_intake.py` / `unittest` commands.
 - WhatsApp (or any messaging) integration, webhooks, retries, deduplication.
 - Real owner authentication and an owner web screen.
 - A live-tested LLM parser, an eval set for it, or any measured extraction accuracy.
-- Tamper-evident audit storage, audit log rotation, or a DB-side history table.
+- Tamper-evident audit storage (hash chain or signing) or audit retention/rotation.
 - Deployment of any kind.
 
 ## Origin

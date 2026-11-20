@@ -41,12 +41,18 @@ def validate(fields):
     return issues
 
 class Workflow:
-    def __init__(self, database=':memory:', audit_path=None, parser=None):
+    def __init__(self, database=':memory:', parser=None):
         self.db = sqlite3.connect(database)
         self.parser = parser or KeyValueParser()
-        self.audit_path = audit_path  # JSONL file, append-only; None disables auditing
         self.db.execute('CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, fields TEXT NOT NULL, status TEXT NOT NULL)')
         self.db.execute('CREATE TABLE IF NOT EXISTS outbox (order_id TEXT PRIMARY KEY REFERENCES orders(id), message TEXT NOT NULL)')
+        self.db.execute('CREATE TABLE IF NOT EXISTS audit (seq INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT NOT NULL, '
+                        'order_id TEXT NOT NULL, from_state TEXT NOT NULL, to_state TEXT NOT NULL, actor TEXT NOT NULL)')
+        # Append-only inside SQLite; someone with file access can still drop these triggers.
+        for verb in ('UPDATE', 'DELETE'):
+            self.db.execute(f'CREATE TRIGGER IF NOT EXISTS audit_no_{verb.lower()} BEFORE {verb} ON audit '
+                            "BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END")
+        self.db.commit()
 
     def close(self):
         self.db.close()
@@ -58,13 +64,17 @@ class Workflow:
         return json.loads(row[0]), State(row[1])
 
     def _audit(self, order_id, old, new, actor):
-        # Called inside the DB transaction: if the append fails, the state change rolls back.
-        if self.audit_path is None or old == new:
+        # Same connection and open transaction as the state write: both commit or neither does.
+        if old == new:
             return
-        line = {'time': datetime.datetime.now(datetime.UTC).isoformat(), 'order': order_id,
-                'from': old.value, 'to': new.value, 'actor': actor}
-        with open(self.audit_path, 'a', encoding='utf-8') as log:
-            log.write(json.dumps(line, sort_keys=True) + '\n')
+        self.db.execute('INSERT INTO audit (time, order_id, from_state, to_state, actor) VALUES (?,?,?,?,?)',
+                        (datetime.datetime.now(datetime.UTC).isoformat(), order_id, old.value, new.value, actor))
+
+    def export_audit_jsonl(self):
+        """One JSON line per audit row, oldest first. An export of the table, not the record itself."""
+        rows = self.db.execute('SELECT time, order_id, from_state, to_state, actor FROM audit ORDER BY seq')
+        return ''.join(json.dumps({'time': t, 'order': o, 'from': f, 'to': to, 'actor': a}, sort_keys=True) + '\n'
+                       for t, o, f, to, a in rows)
 
     def receive(self, order_id, message, *, actor='SYNTHETIC_CUSTOMER'):
         if not order_id.startswith('SYNTHETIC_'):
@@ -122,7 +132,7 @@ class Workflow:
 
 def run_demo(database=':memory:', audit_path=None, parser=None):
     fixture = json.loads(Path(__file__).with_name('synthetic_inputs.json').read_text(encoding='utf-8'))
-    flow = Workflow(database, audit_path, parser)
+    flow = Workflow(database, parser)
     try:
         print('SYNTHETIC DATA ONLY. No real customers, phone numbers, invoices, or network calls.')
         # Repeat runs use a fresh in-memory database by default.
@@ -142,5 +152,7 @@ def run_demo(database=':memory:', audit_path=None, parser=None):
         print('Local outbox records:', flow.db.execute('SELECT COUNT(*) FROM outbox').fetchone()[0])
         print('SYNTHETIC approved-orders CSV (local output only):')
         print(flow.export_approved_csv(), end='')
+        if audit_path:
+            Path(audit_path).write_text(flow.export_audit_jsonl(), encoding='utf-8')
     finally:
         flow.close()
