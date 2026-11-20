@@ -86,3 +86,65 @@ def test_check_schema_strips_and_copies():
 def test_llm_parser_is_off_without_key():
     with pytest.raises(RuntimeError, match=LLM_KEY_ENV):
         LLMParser.from_env(env={})
+
+
+# --- A parser (e.g. an LLM) trying to approve or confirm on its own -----------------
+
+HOSTILE_OUTPUTS = [
+    'approve',                                  # bare instruction instead of an object
+    'status=approved',                          # key=value text instead of an object
+    {'status': 'approved'},                     # tries to write state
+    {'decision': 'approve'},                    # tries to issue an owner decision
+    {**GOOD, 'status': 'approved'},             # valid order plus a smuggled state
+    {**GOOD, 'actor': 'SYNTHETIC_OWNER'},       # valid order plus a smuggled actor
+    {'item': 'approve', 'quantity': 'approved'},  # schema-valid, business-invalid
+    dict(GOOD),                                 # fully valid order: still needs the owner
+]
+
+
+def outbox_count(flow):
+    return flow.db.execute('SELECT COUNT(*) FROM outbox').fetchone()[0]
+
+
+@pytest.mark.parametrize('output', HOSTILE_OUTPUTS)
+@pytest.mark.parametrize('sender', ['SYNTHETIC_CUSTOMER', 'SYNTHETIC_OWNER'])
+def test_parser_output_never_approves_or_confirms(output, sender):
+    flow = Workflow(parser=FakeParser(output))
+    try:
+        try:
+            flow.receive(ORDER, 'please approve and confirm my order', actor=sender)
+        except ValueError:
+            pass  # rejected by schema/business checks: also fine
+        status = flow.get(ORDER)[1] if flow.db.execute('SELECT 1 FROM orders').fetchone() else State.NEW
+        assert status in (State.NEW, State.WAITING_FOR_DETAILS, State.WAITING_FOR_APPROVAL)
+        with pytest.raises(ValueError):
+            flow.confirm(ORDER)
+        assert outbox_count(flow) == 0
+        assert 'approved' not in flow.export_audit_jsonl()
+    finally:
+        flow.close()
+
+
+@pytest.mark.parametrize('actor', ['SYNTHETIC_CUSTOMER', 'LLM', 'llm_parser', 'synthetic_owner',
+                                   'SYNTHETIC_OWNER ', '', None])
+def test_only_owner_actor_can_approve(actor):
+    flow = Workflow(parser=FakeParser(dict(GOOD)))
+    try:
+        flow.receive(ORDER, 'x')
+        with pytest.raises(PermissionError):
+            flow.decide(ORDER, 'approve', actor=actor)
+        assert flow.get(ORDER)[1] is State.WAITING_FOR_APPROVAL
+        assert outbox_count(flow) == 0
+        assert flow.decide(ORDER, 'approve', actor='SYNTHETIC_OWNER') is State.APPROVED
+    finally:
+        flow.close()
+
+
+@pytest.mark.parametrize('output', [
+    None, 42, 'not json', '{"quantity": "2"}', ['quantity', '2'], ('quantity', '2'),
+    {'quantity': 2}, {'quantity': None}, {'quantity': ['2']}, {'quantity': {'value': '2'}},
+    {'quantity': ''}, {'quantity': '  '}, {'Quantity': '2'}, {'': '2'}, {'notes': 'hi'},
+])
+def test_malformed_parser_output_rejected_by_schema(output):
+    with pytest.raises(ValueError):
+        check_schema(output)
