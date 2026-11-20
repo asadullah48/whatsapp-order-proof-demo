@@ -3,3 +3,10 @@ __pycache__/
 *.sqlite
 .env
 .venv/
+# local run artefacts (audit exports, databases, any outbox dumps)
+*.jsonl
+*.db
+outbox/
+outbox*.csv
+outbox*.json
+outbox*.jsonl
